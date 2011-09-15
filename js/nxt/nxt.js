@@ -198,7 +198,6 @@ var NxtView = Nxt.extend({
         var AddButtonView = NxtView.extend({
             element : $('body'),
             render : function () {
-                var self = this;
                 var model = this.properties.model;
                 this.button = $('<button>')
                     .html('Add list item')
@@ -207,18 +206,18 @@ var NxtView = Nxt.extend({
                     })
                 ;
                 
-                this.element.append(this.button);   
+                this.element.append(this.button);
             }
         });
         
         var ReverseButtonView = NxtView.extend({
             element : $('body'),
             render : function () {
-                var self = this;
+                var model = this.properties.model;
                 this.button = $('<button>')
                     .html('Reverse list')
                     .click(function () {
-                        self.properties.model.reverse();
+                        model.reverse();
                     })
                 ;
                 
