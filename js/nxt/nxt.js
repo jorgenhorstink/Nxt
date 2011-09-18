@@ -45,18 +45,9 @@
             subclass.prototype.constructor = subclass.prototype;
 
             // when the object is extended, a superclass reference can be called from the subclass to access the superclass.
-            override(
-                subclass, 
-                merge(
-                    properties, { 
-                        'superclass' : superclass.prototype
-                    }
-                )
-            );
+            override(subclass, merge(properties, { 'superclass' : superclass.prototype }));
 
-            merge(subclass, {
-                'extend' : superclass.extend
-            });
+            merge(subclass, { 'extend' : superclass.extend });
             
             return subclass;
         }
@@ -69,199 +60,176 @@
     
 })(window);
 
-var NewsItem = Nxt.extend({
-    constructor : function (config) {
-        var defaults = {
-            'title' : 'Standaard titel',
-            'content' : 'Standaard tekst'
-        }
-        this.config = Nxt.merge(defaults, config);
-    },
-    getTitle : function () {
-        return this.config.title;   
-    },
-    getContent : function () {
-        return this.config.content;   
-    },
-    getAuthor : function () {
-        // enables lazy object creation
-        return Nxt.ensure(Author, this.config.author);
-    }
-});
-
-var Author = Nxt.extend({
-    constructor : function (config) {
-        this.config = config;   
-    },
-    getUsername : function () {
-        return this.config.username;
-    }
-});
-
-var List = Nxt.extend({
-    constructor : function () {
-        this.clear();   
-    },
-    add : function (item) {
-        this.items.push(item);
-    },
-    clear : function () {
-        this.items = [];  
-    },
-    length : function () {
-        return this.items.length;
-    },
-    getItems : function () {
-        return this.items;   
-    },
-    reverse : function () {
-        this.items = this.items.reverse();
-    }
-});
-
-var ListItem = Nxt.extend({
-    constructor : function (title) {
-        this.title = title;   
-    },
-    getTitle : function () {
-        return this.title;   
-    }
-});
-
 var NxtView = Nxt.extend({
     constructor : function (properties) {
         
         this.properties = Nxt.merge({
-            model : undefined
+            nodeName : undefined,
+            element : undefined
         }, properties);
         
         var model = this.properties.model;
+        var element = this.properties.element;
         
+        var modelListeners = this.ml() || {};
+        var nodeName = this.nodeName || undefined;
+        
+        if (nodeName !== undefined) {
+            this.element = $('<' + nodeName + '>');   
+        }
+        
+        var self = this;
+        $.each(modelListeners, function (index, listener) {
+            var original = model[index];
+            model[index] = function () {
+                original.apply(model, arguments);
+                listener.apply(self, arguments);
+            }
+        });
+        
+        /*
         var self = this;
         $.each(this.events || {}, function (index, event) {
             var original = model[index];
             
             model[index] = function () {
                 original.apply(model, arguments); 
-                self[event].apply(self, arguments);
+                var element = self[event].apply(self, arguments);
+                var current = self.element;
+                current.replaceWith(element);
+                self.element = element;
             }
             
         });
-        this.render();
+        
+        element.append(this.element = this.render(model));
+        */
     }
 });
 
 (function($) {
     
     $(document).ready(function () {
+        var TodoList = Nxt.extend({
+            constructor : function () {
+                this.clear();   
+            },
+            add : function (item) {
+                this.tasks.push(item);
+            },
+            clear : function () {
+                this.tasks = [];  
+            },
+            length : function () {
+                return this.tasks.length;
+            },
+            getTasks : function () {
+                return this.tasks;   
+            },
+            reverse : function () {
+                this.tasks = this.tasks.reverse();
+            }
+        });
+
+        var TodoTask = Nxt.extend({
+            constructor : function (description, done) {
+                this.description = description;
+                this.done = done || false;
+            },
+            getDescription : function () {
+                return this.description; // Just a string containing the task description
+            },
+            toggleDone : function () {
+                this.done = !this.done;
+            },
+            isDone : function () {
+                return this.done;
+            }
+        });
         
-        var ListView = NxtView.extend({
-            element : $('body'),
-            events : {
-                add : 'addItem',
-                reverse : 'render',
-                clear : 'render'
+        var TaskView = NxtView.extend({
+            nodeName : 'li',
+            ml : function () {
+                return { toggleDone : this.render };
             },
             render : function () {
-                if (this.list == undefined) {
-                    this.list = $('<ul>');
-                    this.element.append(this.list);
+                var task = this.properties.model, html;
+                
+                task.isDone() ? this.element.addClass('strike') : this.element.removeClass('strike');
+                
+                var toggleDone = function () {
+                    task.toggleDone;   
                 }
+                
+                this.element.html(task.getDescription()).unbind('click').click(function () {
+                    task.toggleDone(); 
+                });
+
+                return this;
+            }
+        });
+        
+        var TodoView = NxtView.extend({
+            nodeName : 'div',
+            
+            ml : function () { // the model listeners
+                return {
+                    add : this.renderTask, // call this method when a task is added to the TodoList Model
+                    reverse : this.renderTasks // rerender the entire list
+                }
+            },
+            render : function () {
+                var todoList = this.properties.model;
+                
+                this.addButton = $('<button>Add item</button>').click(function () {
+                    todoList.add(new TodoTask('Woei'));
+                });
+
+                this.reverseButton = $('<button>Reverse</button>').click(function () {
+                    todoList.reverse();
+                });
+                
+                this.element.append(this.addButton);
+                this.element.append(this.reverseButton);
+                this.element.append(this.list = $('<ul>'));
+                
+                this.renderTasks();
+                
+                return this;
+            },
+            renderTasks : function () {
+                var todoList = this.properties.model;
+                
                 var self = this;
+                
                 this.list.html('');
-                $.each(this.properties.model.getItems(), function (index, item) {
-                    self.addItem(item);
+                
+                // the view iterates over the tasks in the TodoList Model and renders the task
+                $.each(todoList.getTasks(), function (index, task) {
+                    self.renderTask(task);
                 });
             },
             
-            addItem : function (item) {
-                this.list.append($('<li>').html(item.getTitle()));
+            // will be called when the list is (re)rendered, or when a todoList.add(new TodoTask('boehoe'))
+            // method is called. This actually updates the UI.
+            renderTask : function (task) {
+                var taskView = new TaskView({
+                    'element' : this.list,
+                    'model' : task
+                });
+                this.list.append(taskView.render().element);
             }
         });
+
         
-        var LastListItemView = NxtView.extend({
-            element : $('body'),
-            events : {
-                add : 'addItem'
-            },
-            render : function () {
-                if (this.div == undefined) {
-                    this.div = $('<div>');
-                    this.element.append(this.div);
-                }
-            },
-            addItem : function (item) {
-                this.div.html('Het laatste item wat is toegevoegd is: ' + item.getTitle());
-            }
+        var list = new TodoList();
+        list.add(new TodoTask('Just some tasks'));
+        list.add(new TodoTask('We would like to start with'));
+
+        var todoView = new TodoView({
+            model : list 
         });
         
-        var AddButtonView = NxtView.extend({
-            element : $('body'),
-            render : function () {
-                var model = this.properties.model;
-                this.button = $('<button>')
-                    .html('Add list item')
-                    .click(function () {
-                        model.add(new ListItem('List Item ' + (model.length() + 1)));
-                    })
-                ;
-                
-                this.element.append(this.button);
-            }
-        });
-        
-        var ReverseButtonView = NxtView.extend({
-            element : $('body'),
-            render : function () {
-                var model = this.properties.model;
-                this.button = $('<button>')
-                    .html('Reverse list')
-                    .click(function () {
-                        model.reverse();
-                    })
-                ;
-                
-                this.element.append(this.button);   
-            }
-        });
-        
-        var ClearButtonView = NxtView.extend({
-            element : $('body'),
-            render : function () {
-                var self = this;
-                this.button = $('<button>')
-                    .html('Clear')
-                    .click(function () {
-                        self.properties.model.clear();
-                    })
-                ;
-                
-                this.element.append(this.button);   
-            }
-        });
-        
-        var list = new List();
-        list.add(new ListItem('Begin'));
-        
-        var addButtonView = new AddButtonView({ 'model' : list });
-        var reverseButtonView = new ReverseButtonView({ 'model' : list });
-        var clearButtonView = new ClearButtonView({ 'model' : list });
-        var lastListItemView = new LastListItemView({ 'model' : list });
-        var listView = new ListView({ 'model' : list });
+        $('body').append(todoView.render().element);
     });
 })(jQuery);
-
-/*
-var cni = new CategorizedNewsItem('Title 1', 'Content 1', 'Category 1');
-alert(cni.getCategory() + ', ' + cni.getTitle() + ', ' + cni.getContent());
-
-var cni1 = new CategorizedNewsItem('Title 2', 'Content 2', 'Category 2');
-alert(cni1.getCategory() + ', ' + cni1.getTitle() + ', ' + cni1.getContent());
-cni1.setCategory('Category 2.A');
-alert(cni1.getCategory() + ', ' + cni.getCategory());
-*/
-
-/*
-var newsItem = new NewsItem('Title', 'Content');
-alert(newsItem.getTitle());
-*/
