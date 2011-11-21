@@ -18,18 +18,18 @@
             }
             
             return destination;
-        }
+        };
         
         var override = function (destination, properties) {
             return merge(destination.prototype, properties);   
-        }
+        };
         
         var ensure = function (o, config) {
             if (config instanceof o === false) {
                 config = new o(config);   
             }
             return config;
-        }
+        };
         
         // Nxt root constructor
         var Nxt = function () {};
@@ -50,7 +50,7 @@
             merge(subclass, { 'extend' : superclass.extend });
             
             return subclass;
-        }
+        };
     
         return Nxt;
     
@@ -84,7 +84,7 @@ var NxtView = Nxt.extend({
             model[index] = function () {
                 original.apply(model, arguments);
                 listener.apply(self, arguments);
-            }
+            };
         });
         
         /*
@@ -159,7 +159,7 @@ var NxtView = Nxt.extend({
                 
                 var toggleDone = function () {
                     task.toggleDone;   
-                }
+                };
                 
                 this.element.html(task.getDescription()).unbind('click').click(function () {
                     task.toggleDone(); 
@@ -176,7 +176,7 @@ var NxtView = Nxt.extend({
                 return {
                     add : this.renderTask, // call this method when a task is added to the TodoList Model
                     reverse : this.renderTasks // rerender the entire list
-                }
+                };
             },
             render : function () {
                 var todoList = this.properties.model;
